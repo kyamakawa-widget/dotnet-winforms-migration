@@ -1,48 +1,50 @@
-# 🚀 C# Modernization & Cloud Infrastructure Training Plan
+# 🚀 C# Modernization Plan: WinForms to .NET 8 Web API
 
-本計画は、**「実機（AWS）への課金ゼロ」**かつ**「Windows/WSL2環境」**で完結しつつ、モダンなC#開発者として最高レベルの市場価値（レガシー移行・クラウドネイティブ化）を習得するための独立した2つのプロジェクト構成である。
+## 🏛️ Project A: Legacy to Cloud-Native Modernization
 
----
+### 1. 負債の再現（ドメイン：製造業向け受注管理）
+あえて「救いようのない既存コード」を1画面分作成し、リプレイスの有効性を証明する。
+* **ターゲット:** `LegacyWinFormsApp/FormOrder.cs`
+* **アンチパターンの意図的実装:**
+    * **SQL直書き:** Buttonイベント内に `SELECT * FROM Orders` を文字列で記述。
+    * **密結合:** UIコントロールがビジネスロジックを直接保持（計算結果をそのままラベルに代入）。
+    * **完全同期処理:** `Thread.Sleep` や重いSQL実行で画面がフリーズする仕様。
+    * **設定のハードコード:** 接続文字列をソースコード内に直接記述。
 
-## 🏗️ Project A: Legacy Code Modernization
-**【目的】** 過去の C# 資産を解読し、.NET 8/9 基準のクリーンなアーキテクチャへ再構築する。
+### 2. モダン・リフォーム（.NET 8 LTS 採用）
+2026年時点のエンタープライズ標準である .NET 8 を用い、クラウド前提の構成へ刷新する。
+* **API層:** ASP.NET Core Minimal API (.NET 8)
+    * ボイラープレートを排除し、コードの可読性を最大化。
+* **フロントエンド:** React (Vite) + Tailwind CSS
+    * 「現場のタブレット対応」を想定したレスポンシブな受注入力画面。
+* **疎結合化の徹底 (DI):**
+    * `Microsoft.Extensions.DependencyInjection` を使用。
+    * リポジトリパターンを導入し、DBアクセスをUI（APIエンドポイント）から分離。
+* **データアクセス:** Entity Framework Core 8
+    * PostgreSQL を採用。マイグレーション機能によるスキーマ管理。
+* **非同期化:** 全てのI/Oを `Task` (async/await) で実装し、スケーラビリティを確保。
 
-### 1. ターゲット選定（考古学フェーズ）
-* **GitHub 探索:** `targetFramework="v4.5"` 等を含む、5〜10年前のメンテナンス停止リポジトリを Fork。
-* **AI 静的解析:** AI エージェントにコードを読み込ませ、以下の項目を抽出・レビューする。
-    * **密結合:** `new` 演算子による依存関係のハードコード箇所。
-    * **同期ボトルネック:** `Thread.Sleep` や非同期化されていない I/O 処理。
-    * **レガシー設定:** `web.config` や `Global.asax` に埋もれた設定・初期化ロジック。
-
-### 2. モダン・リプレイス（建築フェーズ）
-* **Minimal API 移行:** .NET 8/9 のトップレベルステートメントを用いた、ボイラープレートレスな Web API への刷新。
-* **DI (Dependency Injection) 実装:** サービスコレクションを用いた疎結合な設計への再定義。
-* **データアクセス近代化:** レガシーな ADO.NET や Dapper 構成を、Entity Framework Core 8 (PostgreSQL) へ移植。
-* **AI レビュー:** AI に「モダンなデザインパターン（Repository, Unit of Work等）」を適用させ、その意図を読み解く。
-
----
-
-## ☁️ Project B: Cloud Native Transformation
-**【目的】** LocalStack を活用し、AWS 実機を使わずにプロフェッショナルなクラウドインフラ構築と CI/CD フローを習得する。
-
-### 1. ローカルクラウド基盤の構築
-* **LocalStack 起動:** Docker Compose を用い、WSL2 上に擬似 AWS 環境（S3, Lambda, RDS, SQS 等）を起動。
-* **Terraform による IaC:** * 手動ポチポチを排し、HCL (HashiCorp Configuration Language) でインフラを定義。
-    * LocalStack に対して `terraform apply` を実行し、環境構築をコードで完結させる。
-
-### 2. クラウド最適化実装と自動化
-* **AWS SDK 連携:** C# アプリに `AWSSDK` を導入。接続先を LocalStack (localhost:4566) に向け、S3 へのファイル保存や Lambda 連携を実装。
-* **コンテナ・ストラテジー:** * `dotnet publish` を用いたマルチステージビルドによる軽量 Docker イメージの作成。
-    * 開発・本番の環境差分を環境変数で吸収する設計の徹底。
-* **GitHub Actions パイプライン:** * プッシュ時に自動で `dotnet test` を実行。
-    * Docker イメージのビルド後、LocalStack 環境に対するデプロイ・シミュレーションの自動化。
+### 3. 証明とデモ（README 駆動開発）
+面談で「何を変えたか」を一瞬で理解させるための資産化。
+* **比較図解:**
+    * Before: SQL-in-Code, Monolithic, Sync.
+    * After: Web API, Clean Architecture, Async.
+* **移行の3原則:**
+    1. **DI導入:** `new` 演算子を排除し、テスト可能な設計へ。
+    2. **Repository化:** ビジネスロジックからSQL（データ操作）を隠蔽。
+    3. **Async化:** パフォーマンスとユーザー体験の向上。
+* **ポータビリティ:**
+    * `docker-compose.yml` により、DB・API・Frontendをコマンド一つで立ち上げ。
+    * xUnit による「正常系受注登録」のインテグレーションテスト1本を実装。
 
 ---
 
 ## 🛠️ Technology Stack Summary
 | 項目 | 採用技術 |
 | :--- | :--- |
-| **Language** | C# 12 / 13 |
-| **Platform** | .NET 8 / 9 (Linux Runtime on WSL2) |
-| **Infrastructure** | Docker, LocalStack (AWS Simulator), Terraform |
-| **Database** | PostgreSQL (with pgvector for AI context) |
+| **Language** | C# 12 |
+| **Platform** | .NET 8 (LTS) |
+| **Framework** | ASP.NET Core Minimal API / React |
+| **ORM** | Entity Framework Core 8 (PostgreSQL) |
+| **Container** | Docker / Docker Compose |
+| **Test** | xUnit |

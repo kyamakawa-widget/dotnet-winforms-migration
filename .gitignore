@@ -1,20 +1,26 @@
-# .NET
-bin/
-obj/
+# --- .NET ---
+[Bb]in/
+[Oo]bj/
 *.user
 *.userosscache
 *.sln.docstates
+.vs/
 
-# Terraform
+# --- Terraform ---
 .terraform/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
 
-# Docker / LocalStack
+# --- Docker / LocalStack ---
 volume/
 .env
 
-# OS
+# --- Python (Webhook listener) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- OS ---
 .DS_Store
 Thumbs.db
