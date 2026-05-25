@@ -33,6 +33,9 @@ var app = builder.Build();
 
 app.UseCors();
 
+app.UseDefaultFiles(); // index.htmlをデフォルトとして扱う
+app.UseStaticFiles();  // wwwrootフォルダの中身を公開する
+
 if (app.Environment.IsDevelopment()) {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -74,6 +77,7 @@ app.MapDelete("/orders/{orderNo}", async (string orderNo, OrderService service) 
     }
 });
 
+app.MapFallbackToFile("index.html");
 app.Run();
 
 // DTO定義

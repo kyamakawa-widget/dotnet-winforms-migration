@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { 
-  Package2, Database, Cloud, Search, Save, Trash2, Printer, 
-  AlertCircle, ChevronDown, CheckCircle2, History, PlusCircle, RefreshCw
+  Package2, Database, Cloud, Save, Trash2, 
+  History, PlusCircle, RefreshCw
 } from "lucide-react"
 
 interface Category { id: number; name: string; }
