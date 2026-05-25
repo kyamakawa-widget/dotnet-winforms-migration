@@ -1,6 +1,37 @@
 using Dapper;
 using Npgsql;
 
+namespace CloudNativeApp.Services;
+
+// --- DTO定義 ---
+public record CreateOrderRequest(
+    string OrderNo,
+    string CustomerName,
+    int CategoryId,
+    string ItemName,
+    decimal Price,
+    int Qty
+);
+
+public record OrderHistoryDto(
+    string orderNo,
+    DateTime orderDate,
+    string customerName,
+    string itemName,
+    decimal price,
+    int qty,
+    decimal totalAmount,
+    string categoryName
+);
+
+public record OrderSummary(
+    decimal SubTotal,
+    decimal TaxAmount,
+    decimal TotalAmount,
+    bool IsHighAmount
+);
+
+// --- Service実装 ---
 public class OrderService
 {
     private readonly string _connectionString;
@@ -8,19 +39,38 @@ public class OrderService
 
     public OrderService(IConfiguration config)
     {
-        _connectionString = config.GetConnectionString("DefaultConnection")!;
+        _connectionString = config.GetConnectionString("DefaultConnection") 
+            ?? "Host=localhost;Database=HANBAI;Username=postgres;Password=p@ssw0rd;";
     }
 
-    // 計算ロジック（単体テストが可能な状態にする）
     public OrderSummary Calculate(decimal price, int qty)
     {
         var sub = price * qty;
-        var tax = sub * TaxRate;
+        var tax = Math.Floor(sub * TaxRate); 
         var total = sub + tax;
         return new OrderSummary(sub, tax, total, total > 1000000);
     }
 
-    // 保存ロジック（トランザクション処理）
+    public async Task<IEnumerable<OrderHistoryDto>> GetOrdersAsync()
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        const string sql = @"
+            SELECT 
+                o.orderno, 
+                o.orderdate, 
+                o.customername, 
+                o.itemname, 
+                o.price, 
+                o.qty, 
+                o.totalamount, 
+                c.categoryname
+            FROM Orders o
+            JOIN M_Category c ON o.categoryid = c.categoryid
+            ORDER BY o.orderdate DESC";
+        
+        return await conn.QueryAsync<OrderHistoryDto>(sql);
+    }
+
     public async Task<bool> RegisterOrderAsync(CreateOrderRequest req)
     {
         using var conn = new NpgsqlConnection(_connectionString);
@@ -31,7 +81,6 @@ public class OrderService
         {
             var summary = Calculate(req.Price, req.Qty);
 
-            // 1. 注文登録
             const string sqlOrder = @"
                 INSERT INTO Orders (OrderNo, OrderDate, CustomerName, CategoryId, ItemName, Price, Qty, TotalAmount)
                 VALUES (@OrderNo, @OrderDate, @CustomerName, @CategoryId, @ItemName, @Price, @Qty, @TotalAmount)";
@@ -47,18 +96,58 @@ public class OrderService
                 summary.TotalAmount
             }, tran);
 
-            // 2. 在庫更新
             const string sqlStock = "UPDATE M_Stock SET CurrentStock = CurrentStock - @Qty WHERE ItemName = @ItemName";
-            var affected = await conn.ExecuteAsync(sqlStock, new { req.Qty, req.ItemName }, tran);
-
-            if (affected == 0) throw new Exception("在庫が見つかりません。");
+            await conn.ExecuteAsync(sqlStock, new { req.Qty, req.ItemName }, tran);
 
             await tran.CommitAsync();
             return true;
         }
-        catch
+        catch (Exception ex)
         {
             await tran.RollbackAsync();
+            Console.WriteLine($"Register Error: {ex.Message}");
+            throw;
+        }
+    }
+
+    // ★ 削除時の在庫計算を安全に行うための専用クラス
+    private class StockInfo
+    {
+        public string itemname { get; set; }
+        public int qty { get; set; }
+    }
+
+    // 3. 受注取消（dynamicを廃止し、StockInfo型を使用）
+    public async Task<bool> DeleteOrderAsync(string orderNo)
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        await conn.OpenAsync();
+        using var tran = await conn.BeginTransactionAsync();
+
+        try
+        {
+            const string sqlSelect = "SELECT itemname, qty FROM Orders WHERE orderno = @orderNo";
+            
+            // dynamicではなく、明確な型（StockInfo）として取得する
+            var order = await conn.QuerySingleOrDefaultAsync<StockInfo>(sqlSelect, new { orderNo }, tran);
+
+            if (order != null)
+            {
+                const string sqlUpdateStock = "UPDATE M_Stock SET CurrentStock = CurrentStock + @Qty WHERE ItemName = @ItemName";
+                await conn.ExecuteAsync(sqlUpdateStock, new { Qty = order.qty, ItemName = order.itemname }, tran);
+
+                const string sqlDelete = "DELETE FROM Orders WHERE orderno = @orderNo";
+                await conn.ExecuteAsync(sqlDelete, new { orderNo }, tran);
+
+                await tran.CommitAsync();
+                return true;
+            }
+            return false;
+        }
+        catch (Exception ex)
+        {
+            await tran.RollbackAsync();
+            Console.WriteLine($"Delete Error: {ex.Message}");
             throw;
         }
     }

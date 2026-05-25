@@ -1,19 +1,22 @@
 @import "tailwindcss";
 
-/* 以前のブログ風設定（#root { width: ... } 等）はすべて捨てます */
-
-:root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
+/* 以前の radius 設定などは維持 */
+@layer base {
+  :root {
+    --radius: 0.3rem; 
+  }
 }
 
-/* 全画面を使い切るための設定 */
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
+/* 業務システム向けカラーテーマの定義 */
+@theme {
+  --color-primary: #1f2937; /* slate-800. 主要なボタン（保存、検索） */
+  --color-accent: #0284c7; /* sky-600. 落ち着いた青。リンク、ステータス、ヘッダーアイコン */
+  --color-popover: #f1f5f9; /* slate-100. 計算エリアの背景。ダークからライトグレーへ */
+  --color-muted: #e2e8f0; /* slate-200. カテゴリなどの背景 */
+  --color-foreground: #0f172a; /* slate-900. 通常テキスト */
 }
 
 body {
-  @apply bg-slate-100 text-slate-900 text-[13px] antialiased;
+  @apply bg-slate-50 text-foreground text-[13px] antialiased; /* 背景を少し明るく */
+  margin: 0;
 }

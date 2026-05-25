@@ -68,6 +68,10 @@
 * **安全なデータアクセス**: パラメータ化クエリまたは ORM を使用。
 * **ポータビリティ**: Docker 化により、実行環境に依存しないデプロイを実現。
 
+### 実装された主な新機能
+* **注文履歴の可視化**: 過去の受注データを一覧で確認できる「注文履歴」タブを新設。
+* **安全な取消処理**: 履歴一覧からの削除アクションに連動し、APIのトランザクション内で在庫の自動復元を安全に実行。
+
 ---
 
 ## 4. 技術スタック
@@ -102,11 +106,11 @@
 ## 6. ディレクトリ構造
 ```text
 .
-├── legacy/           # Before: WinForms風の密結合サンプル
-├── src/
-│   ├── Api/          # .NET 8 Web API (Service / Repository)
-│   └── Web/          # React Frontend
-├── tests/            # API / Service層の単体テスト
-├── docs/             # 移行計画・詳細ドキュメント
-└── docker-compose.yml
+  ├── legacy/            # Before: WinForms風の密結合サンプル
+  ├── src/
+  │   ├── Api/           # .NET 8 Web API (Service / Repository)
+  │   ├── Api.Tests/     # API / Service層の単体テスト
+  │   └── Web/           # React Frontend
+  ├── docs/              # 移行計画・詳細ドキュメント
+  └── docker-compose.yml
 ```
