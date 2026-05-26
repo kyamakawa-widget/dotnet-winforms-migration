@@ -1,7 +1,4 @@
 using Amazon.S3;
-using Dapper;
-using Microsoft.AspNetCore.Mvc;
-using Npgsql;
 using CloudNativeApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,9 +18,7 @@ builder.Services.AddCors(options => {
 });
 
 // --- Service / DB 設定 ---
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-    ?? "Host=localhost;Database=HANBAI;Username=postgres;Password=p@ssw0rd;";
-
+builder.Services.AddScoped<TaxService>();
 builder.Services.AddScoped<OrderService>();
 
 builder.Services.AddSingleton<IAmazonS3>(sp => {
@@ -36,8 +31,8 @@ var app = builder.Build();
 
 app.UseCors();
 
-app.UseDefaultFiles(); // index.htmlをデフォルトとして扱う
-app.UseStaticFiles();  // wwwrootフォルダの中身を公開する
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseSwagger();
 app.UseSwaggerUI();
@@ -45,14 +40,12 @@ app.UseSwaggerUI();
 // --- エンドポイント定義 ---
 
 // 1. カテゴリマスタ取得
-app.MapGet("/categories", async () => {
-    using var conn = new NpgsqlConnection(connectionString);
-    const string sql = "SELECT CategoryId as Id, CategoryName as Name FROM M_Category WHERE DeleteFlg = 0";
-    var categories = await conn.QueryAsync<CategoryDto>(sql);
+app.MapGet("/categories", async (OrderService service) => {
+    var categories = await service.GetCategoriesAsync();
     return Results.Ok(categories);
 });
 
-// 2. 受注履歴の取得 (追加)
+// 2. 受注履歴の取得
 app.MapGet("/orders", async (OrderService service) => {
     var orders = await service.GetOrdersAsync();
     return Results.Ok(orders);
@@ -68,7 +61,7 @@ app.MapPost("/orders", async (CreateOrderRequest req, OrderService service) => {
     }
 });
 
-// 4. 受注取消 (追加)
+// 4. 受注取消
 app.MapDelete("/orders/{orderNo}", async (string orderNo, OrderService service) => {
     try {
         var success = await service.DeleteOrderAsync(orderNo);
@@ -80,6 +73,3 @@ app.MapDelete("/orders/{orderNo}", async (string orderNo, OrderService service) 
 
 app.MapFallbackToFile("index.html");
 app.Run();
-
-// DTO定義
-public record CategoryDto(int Id, string Name);

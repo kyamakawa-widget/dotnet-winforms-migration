@@ -4,6 +4,8 @@ using Npgsql;
 namespace CloudNativeApp.Services;
 
 // --- DTO定義 ---
+public record CategoryDto(int Id, string Name);
+
 public record CreateOrderRequest(
     string OrderNo,
     string CustomerName,
@@ -35,21 +37,29 @@ public record OrderSummary(
 public class OrderService
 {
     private readonly string _connectionString;
-    private const decimal TaxRate = 0.1m;
+    private readonly TaxService _taxService;
 
-    public OrderService(IConfiguration config)
+    public OrderService(IConfiguration config, TaxService taxService)
     {
         _connectionString = config.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException(
-        "ConnectionStrings:DefaultConnection が設定されていません。");
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:DefaultConnection が設定されていません。");
+        _taxService = taxService;
     }
 
     public OrderSummary Calculate(decimal price, int qty)
     {
         var sub = price * qty;
-        var tax = Math.Floor(sub * TaxRate); 
+        var tax = _taxService.Calculate(sub);
         var total = sub + tax;
-        return new OrderSummary(sub, tax, total, total > 1000000);
+        return new OrderSummary(sub, tax, total, total > 1_000_000);
+    }
+
+    public async Task<IEnumerable<CategoryDto>> GetCategoriesAsync()
+    {
+        using var conn = new NpgsqlConnection(_connectionString);
+        const string sql = "SELECT CategoryId as Id, CategoryName as Name FROM M_Category WHERE DeleteFlg = 0";
+        return await conn.QueryAsync<CategoryDto>(sql);
     }
 
     public async Task<IEnumerable<OrderHistoryDto>> GetOrdersAsync()
@@ -68,7 +78,7 @@ public class OrderService
             FROM Orders o
             JOIN M_Category c ON o.categoryid = c.categoryid
             ORDER BY o.orderdate DESC";
-        
+
         return await conn.QueryAsync<OrderHistoryDto>(sql);
     }
 
@@ -85,7 +95,7 @@ public class OrderService
             const string sqlOrder = @"
                 INSERT INTO Orders (OrderNo, OrderDate, CustomerName, CategoryId, ItemName, Price, Qty, TotalAmount)
                 VALUES (@OrderNo, @OrderDate, @CustomerName, @CategoryId, @ItemName, @Price, @Qty, @TotalAmount)";
-            
+
             await conn.ExecuteAsync(sqlOrder, new {
                 req.OrderNo,
                 OrderDate = DateTime.Now,
@@ -111,13 +121,6 @@ public class OrderService
         }
     }
 
-    private class StockInfo
-{
-    public string itemname { get; set; } = string.Empty;
-    public int qty { get; set; }
-}
-
-    // 3. 受注取消（dynamicを廃止し、StockInfo型を使用）
     public async Task<bool> DeleteOrderAsync(string orderNo)
     {
         using var conn = new NpgsqlConnection(_connectionString);
@@ -127,14 +130,12 @@ public class OrderService
         try
         {
             const string sqlSelect = "SELECT itemname, qty FROM Orders WHERE orderno = @orderNo";
-            
-            // dynamicではなく、明確な型（StockInfo）として取得する
             var order = await conn.QuerySingleOrDefaultAsync<StockInfo>(sqlSelect, new { orderNo }, tran);
 
             if (order != null)
             {
                 const string sqlUpdateStock = "UPDATE M_Stock SET CurrentStock = CurrentStock + @Qty WHERE ItemName = @ItemName";
-                await conn.ExecuteAsync(sqlUpdateStock, new { Qty = order.qty, ItemName = order.itemname }, tran);
+                await conn.ExecuteAsync(sqlUpdateStock, new { Qty = order.Qty, ItemName = order.ItemName }, tran);
 
                 const string sqlDelete = "DELETE FROM Orders WHERE orderno = @orderNo";
                 await conn.ExecuteAsync(sqlDelete, new { orderNo }, tran);
@@ -150,5 +151,11 @@ public class OrderService
             Console.WriteLine($"Delete Error: {ex.Message}");
             throw;
         }
+    }
+
+    private class StockInfo
+    {
+        public string ItemName { get; set; } = string.Empty;
+        public int Qty { get; set; }
     }
 }

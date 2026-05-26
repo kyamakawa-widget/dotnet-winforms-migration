@@ -5,16 +5,16 @@ namespace CloudNativeApp.Tests;
 
 public class OrderServiceTests
 {
-    private static OrderService MakeService()
-    {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=test"
-            })
-            .Build();
-        return new OrderService(config);
-    }
+    private static orderservice makeservice()
+{
+    var config = new configurationbuilder()
+        .addinmemorycollection(new dictionary<string, string?>
+        {
+            ["connectionstrings:defaultconnection"] = "host=test"
+        })
+        .build();
+    return new orderservice(config, new taxservice());
+}
 
     [Theory]
     [InlineData(1000,   1,   1000,  100,   1100, false)]
