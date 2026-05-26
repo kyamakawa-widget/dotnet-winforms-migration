@@ -119,7 +119,7 @@
 > 本プロジェクトは **「レガシー資産の解体と構造分離」** に特化しています。  
 > 「認証・認可 (Auth0 等)」や「本番用 DB の冗長化構成」などは **対象外 (Out-of-Scope)** としています。
 
-> **インフラ補足**: デモは Cloudflare Tunnel（一時 URL）で公開。  
+> **インフラ補足**: デプロイは infrastructure/deploy.sh（WSL から rsync + systemctl）で実行。  
 > 本番想定では Cloudflare Zero Trust による独自ドメイン＋アクセス制御、  
 > または Terraform 定義を AWS (ECS/RDS/S3) へ拡張してデプロイ。
 
@@ -137,6 +137,7 @@
 ├── infrastructure/              # IaC・インフラストラクチャ定義
 │   ├── db/init/
 │   │   └── 01_schema.sql        # データベース初期化用 SQL
+│   ├── deploy.sh                # WSL → VPS デプロイスクリプト（ビルド・転送・再起動）
 │   ├── main.tf                  # Terraform 定義（AWS ECS/RDS/S3 等の環境構築用）
 │   ├── ci.sh                    # CI/デプロイ支援スクリプト
 │   └── webhook_listener.py      # Webhook 受信・処理スクリプト
@@ -148,4 +149,3 @@
 │   └── Web/                     # After: React Frontend (Vite / TypeScript / Tailwind CSS)
 ├── docker-compose.yml           # ローカル開発用コンテナ構成（API / PostgreSQL / LocalStack）
 └── README.md                    # 本ドキュメント
-```
