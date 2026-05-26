@@ -1,4 +1,4 @@
-# .NET Modernization Lab
+# .NET Windows Migration
 
 [![CI](https://github.com/kyamakawa-widget/dotnet-modernization-lab/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/kyamakawa-widget/dotnet-modernization-lab/actions/workflows/ci.yml)
 
