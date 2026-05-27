@@ -23,10 +23,22 @@ class AgentState(TypedDict):
 # ---------- LLM ----------
 def _llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-3.1-flash-lite",
         google_api_key=os.environ["GEMINI_API_KEY"],
         temperature=0,
     )
+
+
+def _text(resp) -> str:
+    c = resp.content
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return " ".join(
+            item.get("text", "") if isinstance(item, dict) else str(item)
+            for item in c
+        )
+    return str(c)
 
 
 # ---------- Nodes ----------
@@ -38,7 +50,7 @@ def classify_intent(state: AgentState) -> AgentState:
         f"「YES」か「NO」のみ回答してください。"
     )
     resp = _llm().invoke([HumanMessage(content=prompt)])
-    if "NO" in resp.content.upper():
+    if "NO" in _text(resp).upper():
         return {
             **state,
             "answer": "受注データに関する質問をどうぞ。例:「先月の売上は？」「得意先ランキングは？」",
@@ -59,8 +71,7 @@ def generate_sql(state: AgentState) -> AgentState:
         f"SELECT文のみを出力してください。説明不要。コードブロック(```)も不要。"
     )
     resp = _llm().invoke([HumanMessage(content=prompt)])
-    raw = resp.content.strip()
-    # コードブロック除去
+    raw = _text(resp).strip()
     sql = re.sub(r"```(?:sql)?", "", raw).replace("```", "").strip()
     return {**state, "sql": sql, "error": ""}
 
@@ -101,7 +112,7 @@ def format_response(state: AgentState) -> AgentState:
     )
     resp = _llm().invoke([HumanMessage(content=prompt)])
     db.log_agent(state["question"], state["sql"], True, state.get("retry_count", 0), None)
-    return {**state, "answer": resp.content}
+    return {**state, "answer": _text(resp)}
 
 
 def handle_error(state: AgentState) -> AgentState:
@@ -128,7 +139,7 @@ def route_execute(state: AgentState) -> str:
     if not state.get("error"):
         return "format_response"
     if state.get("retry_count", 0) < 2:
-        return "generate_sql"  # retry
+        return "generate_sql"
     return "handle_error"
 
 
