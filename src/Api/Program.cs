@@ -20,7 +20,6 @@ builder.Services.AddCors(options => {
 // --- Service / DB 設定 ---
 builder.Services.AddScoped<TaxService>();
 builder.Services.AddScoped<OrderService>();
-
 builder.Services.AddSingleton<IAmazonS3>(sp => {
     var serviceUrl = builder.Configuration["AWS:ServiceURL"] ?? "http://localhost:4566";
     var config = new AmazonS3Config { ServiceURL = serviceUrl, ForcePathStyle = true };
@@ -30,10 +29,8 @@ builder.Services.AddSingleton<IAmazonS3>(sp => {
 var app = builder.Build();
 
 app.UseCors();
-
 app.UseDefaultFiles();
 app.UseStaticFiles();
-
 app.UseSwagger(options => {
     options.RouteTemplate = "api-docs/{documentName}/swagger.json";
 });
@@ -50,13 +47,33 @@ app.MapGet("/categories", async (OrderService service) => {
     return Results.Ok(categories);
 });
 
-// 2. 受注履歴の取得
-app.MapGet("/orders", async (OrderService service) => {
-    var orders = await service.GetOrdersAsync();
+// 2. 受注履歴の取得（フィルタ対応）
+app.MapGet("/orders", async (
+    OrderService service,
+    string? customerName,
+    int? categoryId,
+    DateTime? from,
+    DateTime? to) =>
+{
+    var filter = new OrderFilterParams(customerName, categoryId, from, to);
+    var orders = await service.GetOrdersAsync(filter);
     return Results.Ok(orders);
 });
 
-// 3. 受注登録
+// 3. 受注履歴 CSV エクスポート
+app.MapGet("/orders/export", async (
+    OrderService service,
+    string? customerName,
+    int? categoryId,
+    DateTime? from,
+    DateTime? to) =>
+{
+    var filter = new OrderFilterParams(customerName, categoryId, from, to);
+    var csvBytes = await service.GetOrdersCsvAsync(filter);
+    return Results.File(csvBytes, "text/csv; charset=utf-8", "orders.csv");
+});
+
+// 4. 受注登録
 app.MapPost("/orders", async (CreateOrderRequest req, OrderService service) => {
     try {
         var success = await service.RegisterOrderAsync(req);
@@ -66,7 +83,7 @@ app.MapPost("/orders", async (CreateOrderRequest req, OrderService service) => {
     }
 });
 
-// 4. 受注取消
+// 5. 受注取消
 app.MapDelete("/orders/{orderNo}", async (string orderNo, OrderService service) => {
     try {
         var success = await service.DeleteOrderAsync(orderNo);

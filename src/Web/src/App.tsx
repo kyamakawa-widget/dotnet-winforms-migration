@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { 
   Package2, Database, Cloud, Save, Trash2, 
-  History, PlusCircle, RefreshCw
+  History, PlusCircle, RefreshCw, Download
 } from "lucide-react"
 
 interface Category { id: number; name: string; }
@@ -24,12 +24,19 @@ function App() {
   const [history, setHistory] = useState<OrderHistory[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // 受注登録フォーム
   const [orderNo, setOrderNo] = useState(`ORD-${new Date().getTime().toString().slice(-6)}`);
   const [customer, setCustomer] = useState("");
   const [selectedCat, setSelectedCat] = useState<number>(1);
   const [itemName, setItemName] = useState("");
   const [price, setPrice] = useState(0);
   const [qty, setQty] = useState(1);
+
+  // 履歴フィルタ
+  const [filterCustomer, setFilterCustomer] = useState("");
+  const [filterCategoryId, setFilterCategoryId] = useState(0);
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
 
   const subTotal = price * qty;
   const tax = Math.floor(subTotal * 0.1);
@@ -44,11 +51,21 @@ function App() {
       });
   }, []);
 
+  const buildFilterQuery = () => {
+    const params = new URLSearchParams();
+    if (filterCustomer) params.set('customerName', filterCustomer);
+    if (filterCategoryId > 0) params.set('categoryId', String(filterCategoryId));
+    if (filterFrom) params.set('from', filterFrom);
+    if (filterTo) params.set('to', filterTo);
+    return params.toString();
+  };
+
   const fetchHistory = async () => {
     setLoading(true);
     try {
-      // ★ 修正箇所：ブラウザのキャッシュを無視し、必ずDBの最新状態を取得する
-      const res = await fetch(`${API_BASE}/orders`, { cache: 'no-store' });
+      const query = buildFilterQuery();
+      const url = `${API_BASE}/orders${query ? `?${query}` : ''}`;
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setHistory(data);
@@ -58,6 +75,11 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportCsv = () => {
+    const query = buildFilterQuery();
+    window.location.href = `${API_BASE}/orders/export${query ? `?${query}` : ''}`;
   };
 
   useEffect(() => {
@@ -93,7 +115,6 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/orders/${targetOrderNo}`, { method: 'DELETE' });
       if (res.ok) {
-        // 削除成功時、キャッシュを無視するfetchHistoryが呼ばれ、画面から完全に消える
         fetchHistory();
       } else {
         alert("削除に失敗しました");
@@ -193,6 +214,7 @@ function App() {
             </div>
           ) : (
             <div className="bg-white border rounded-lg shadow-sm overflow-hidden animate-in slide-in-from-bottom-2 duration-300">
+              {/* ヘッダー */}
               <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-600 flex items-center gap-2">
                   <History className="w-4 h-4" /> 最近の受注履歴
@@ -201,6 +223,65 @@ function App() {
                   <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
+
+              {/* フィルタバー */}
+              <div className="px-6 py-3 border-b bg-white flex flex-wrap gap-3 items-end">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">得意先名</label>
+                  <input
+                    type="text"
+                    value={filterCustomer}
+                    onChange={e => setFilterCustomer(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && fetchHistory()}
+                    placeholder="部分一致"
+                    className="h-8 px-2 border border-slate-300 rounded text-xs focus:border-sky-600 outline-none w-36"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">カテゴリ</label>
+                  <select
+                    value={filterCategoryId}
+                    onChange={e => setFilterCategoryId(Number(e.target.value))}
+                    className="h-8 px-2 border border-slate-300 rounded text-xs bg-white focus:border-sky-600 outline-none w-28"
+                  >
+                    <option value={0}>全て</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">開始日</label>
+                  <input
+                    type="date"
+                    value={filterFrom}
+                    onChange={e => setFilterFrom(e.target.value)}
+                    className="h-8 px-2 border border-slate-300 rounded text-xs focus:border-sky-600 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">終了日</label>
+                  <input
+                    type="date"
+                    value={filterTo}
+                    onChange={e => setFilterTo(e.target.value)}
+                    className="h-8 px-2 border border-slate-300 rounded text-xs focus:border-sky-600 outline-none"
+                  />
+                </div>
+                <button
+                  onClick={fetchHistory}
+                  disabled={loading}
+                  className="h-8 px-4 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-bold rounded transition-colors"
+                >
+                  検索
+                </button>
+                <button
+                  onClick={handleExportCsv}
+                  className="h-8 px-4 bg-slate-600 hover:bg-slate-500 text-white text-xs font-bold rounded transition-colors flex items-center gap-1"
+                >
+                  <Download className="w-3 h-3" /> CSV
+                </button>
+              </div>
+
+              {/* テーブル */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b">

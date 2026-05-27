@@ -1,5 +1,6 @@
 using Dapper;
 using Npgsql;
+using System.Text;
 
 namespace CloudNativeApp.Services;
 
@@ -33,6 +34,13 @@ public record OrderSummary(
     bool IsHighAmount
 );
 
+public record OrderFilterParams(
+    string? CustomerName,
+    int? CategoryId,
+    DateTime? From,
+    DateTime? To
+);
+
 // --- Service実装 ---
 public class OrderService
 {
@@ -62,10 +70,35 @@ public class OrderService
         return await conn.QueryAsync<CategoryDto>(sql);
     }
 
-    public async Task<IEnumerable<OrderHistoryDto>> GetOrdersAsync()
+    public async Task<IEnumerable<OrderHistoryDto>> GetOrdersAsync(OrderFilterParams? filter = null)
     {
         using var conn = new NpgsqlConnection(_connectionString);
-        const string sql = @"
+        var conditions = new List<string> { "1=1" };
+        var parameters = new DynamicParameters();
+
+        if (!string.IsNullOrWhiteSpace(filter?.CustomerName))
+        {
+            conditions.Add("o.customername ILIKE @CustomerName");
+            parameters.Add("CustomerName", $"%{filter.CustomerName}%");
+        }
+        if (filter?.CategoryId.HasValue == true)
+        {
+            conditions.Add("o.categoryid = @CategoryId");
+            parameters.Add("CategoryId", filter.CategoryId.Value);
+        }
+        if (filter?.From.HasValue == true)
+        {
+            conditions.Add("o.orderdate >= @From");
+            parameters.Add("From", filter.From.Value);
+        }
+        if (filter?.To.HasValue == true)
+        {
+            conditions.Add("o.orderdate < @To");
+            parameters.Add("To", filter.To.Value.Date.AddDays(1));
+        }
+
+        var where = string.Join(" AND ", conditions);
+        var sql = $@"
             SELECT 
                 o.orderno, 
                 o.orderdate, 
@@ -77,9 +110,23 @@ public class OrderService
                 c.categoryname
             FROM Orders o
             JOIN M_Category c ON o.categoryid = c.categoryid
+            WHERE {where}
             ORDER BY o.orderdate DESC";
 
-        return await conn.QueryAsync<OrderHistoryDto>(sql);
+        return await conn.QueryAsync<OrderHistoryDto>(sql, parameters);
+    }
+
+    public async Task<byte[]> GetOrdersCsvAsync(OrderFilterParams? filter = null)
+    {
+        var orders = await GetOrdersAsync(filter);
+        var sb = new StringBuilder();
+        sb.AppendLine("受注番号,受注日時,得意先名,商品名,カテゴリ,単価,数量,合計金額");
+        foreach (var o in orders)
+        {
+            sb.AppendLine($"{o.orderNo},{o.orderDate:yyyy-MM-dd HH:mm:ss},{o.customerName},{o.itemName},{o.categoryName},{o.price},{o.qty},{o.totalAmount}");
+        }
+        // UTF-8 BOM付き（Excelで文字化けしない）
+        return Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
     }
 
     public async Task<bool> RegisterOrderAsync(CreateOrderRequest req)
