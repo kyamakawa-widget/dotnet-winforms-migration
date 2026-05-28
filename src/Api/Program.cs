@@ -85,6 +85,18 @@ app.MapPost("/orders", async (CreateOrderRequest req, OrderService service) => {
     }
 });
 
+// 追加: /chat → Python Agent プロキシ
+app.MapPost("/chat", async (HttpContext ctx) => {
+    using var client = new HttpClient();
+    var body = await new StreamReader(ctx.Request.Body).ReadToEndAsync();
+    var resp = await client.PostAsync(
+        "http://localhost:8001/chat",
+        new StringContent(body, System.Text.Encoding.UTF8, "application/json")
+    );
+    var result = await resp.Content.ReadAsStringAsync();
+    return Results.Content(result, "application/json");
+});
+
 // 5. 受注取消
 app.MapDelete("/orders/{orderNo}", async (string orderNo, OrderService service) => {
     try {

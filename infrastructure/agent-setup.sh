@@ -6,7 +6,7 @@ set -euo pipefail
 AGENT_DIR="/home/k_yamakawa/ops/modernization-lab/agent"
 
 echo "==> Python venv セットアップ"
-python3 -m venv "$AGENT_DIR/.venv"
+python3.11 -m venv "$AGENT_DIR/.venv"
 "$AGENT_DIR/.venv/bin/pip" install --upgrade pip
 "$AGENT_DIR/.venv/bin/pip" install -r "$AGENT_DIR/requirements.txt"
 

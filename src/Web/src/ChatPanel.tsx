@@ -15,7 +15,7 @@ const SUGGESTED = [
   "今月の受注件数は？",
 ]
 
-const AGENT_BASE = import.meta.env.VITE_AGENT_BASE ?? "http://localhost:8001"
+const AGENT_BASE = import.meta.env.VITE_AGENT_BASE ?? ""
 
 export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([
